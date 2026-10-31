@@ -79,11 +79,49 @@ uvicorn App.main:app --reload
 ## Estado del proyecto
 
 - [x] Estructura base del repositorio
-- [ ] Autenticación
-- [ ] Rutinas + Rachas
+- [x] Autenticación (rama `feature/auth`)
+  - Registro / Login (correo o username + contraseña)
+  - Recuperación de contraseña con OTP 6 dígitos (10 min, un solo uso)
+  - Perfil de usuario (nombre, avatar, bio, tema, color)
+  - JWT Bearer
+  - Estructura lista para Google Sign-In (pendiente de CLIENT_ID)
+- [x] Rutinas + Rachas (rama `feature/routines`)
+  - CRUD de plantillas (nombre, días, hora, duración, puntos base)
+  - Ocurrencias diarias automáticas
+  - Estados: pendiente / falta_verificacion / completada / incompleta / perdida
+  - Racha solo si se completan TODAS las del día + bonus de puntos
+  - Idempotencia de racha (`last_streak_date`)
 - [ ] Motor de IA
 - [ ] Verificación
-- [ ] Puntos + Tienda
+- [ ] Tienda
 - [ ] Red social
 - [ ] Panel de administración
 - [ ] Despliegue permanente
+
+## Endpoints de autenticación (Paso 1)
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| POST | `/auth/register` | Crear cuenta |
+| POST | `/auth/login` | Login (identifier = email o username) |
+| POST | `/auth/google` | Google Sign-In (estructura; 501 por ahora) |
+| POST | `/auth/forgot-password` | Solicitar OTP al correo |
+| POST | `/auth/reset-password` | Cambiar contraseña con OTP |
+| GET | `/auth/me` | Perfil del usuario autenticado |
+| PUT | `/auth/me` | Actualizar perfil |
+
+## Endpoints de rutinas (Paso 2)
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| POST | `/routines` | Crear rutina |
+| GET | `/routines` | Listar rutinas activas |
+| GET | `/routines/today` | Ocurrencias de hoy + resumen |
+| GET | `/routines/streak` | Racha y puntos |
+| GET | `/routines/{id}` | Detalle de rutina |
+| PUT | `/routines/{id}` | Actualizar rutina |
+| DELETE | `/routines/{id}` | Soft-delete |
+| PATCH | `/routines/occurrences/{id}/status` | Cambiar estado (+ puntos/racha) |
+| POST | `/routines/evaluate-today` | Forzar evaluación del día |
+
+Documentación interactiva: http://127.0.0.1:8000/docs

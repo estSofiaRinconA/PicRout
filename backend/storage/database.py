@@ -40,5 +40,6 @@ def init_db():
     """Crea todas las tablas. Llamar al arrancar la aplicación."""
     # Importar modelos para que se registren en Base.metadata
     from entities.user import User, PasswordOTP  # noqa: F401
+    from entities.routine import Routine, RoutineOccurrence  # noqa: F401
 
     Base.metadata.create_all(bind=engine)

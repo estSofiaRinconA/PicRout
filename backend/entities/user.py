@@ -2,12 +2,13 @@
 Modelos de Usuario y OTP de recuperación de contraseña.
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, date, timezone
 from sqlalchemy import (
     String,
     Boolean,
     Integer,
     DateTime,
+    Date,
     Text,
     ForeignKey,
 )
@@ -38,10 +39,12 @@ class User(Base):
     # Google
     google_id: Mapped[str | None] = mapped_column(String(100), unique=True, nullable=True, index=True)
 
-    # Gamificación básica (se usará en pasos siguientes)
+    # Gamificación básica (Paso 2: rachas y puntos)
     points: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     current_streak: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     longest_streak: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    # Fecha del último día en que se incrementó la racha (idempotencia)
+    last_streak_date: Mapped[date | None] = mapped_column(Date, nullable=True)
 
     # Estado
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="1")

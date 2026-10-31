@@ -50,11 +50,11 @@ def health_check():
 
 
 # Routers
-from App.routers import auth  # noqa: E402
+from App.routers import auth, routines  # noqa: E402
 
 app.include_router(auth.router)
+app.include_router(routines.router)
 
 # Aquí se incluirán los routers de las siguientes fases:
-# from App.routers import profile, routines, verification, points, store, social, notifications, admin
-# app.include_router(routines.router)
+# from App.routers import verification, points, store, social, notifications, admin
 # ... etc

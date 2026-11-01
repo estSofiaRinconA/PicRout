@@ -30,6 +30,7 @@ from functions.streak import (
     evaluate_day_and_update_streak,
     award_completion_points,
 )
+from ai.llm_analyzer import analyze_routine_smart as analyze_routine
 
 router = APIRouter(prefix="/routines", tags=["Rutinas"])
 
@@ -85,15 +86,28 @@ def create_routine(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Crea una nueva rutina (plantilla) para el usuario autenticado."""
+    """
+    Crea una nueva rutina (plantilla) para el usuario autenticado.
+    La IA analiza nombre + descripción y asigna método de verificación y puntos base
+    (si el cliente no envía base_points explícito o deja el default).
+    """
+    name = payload.name.strip()
+    description = payload.description.strip() if payload.description else None
+
+    # Análisis IA (Paso 3)
+    analysis = analyze_routine(name, description)
+    # Si el cliente envió un valor distinto del default (10), se respeta; si no, usa IA
+    points = payload.base_points if payload.base_points != 10 else analysis.base_points
+
     routine = Routine(
         user_id=current_user.id,
-        name=payload.name.strip(),
-        description=payload.description.strip() if payload.description else None,
+        name=name,
+        description=description,
         days_of_week=_days_to_str(payload.days_of_week),
         scheduled_time=payload.scheduled_time,
         duration_minutes=payload.duration_minutes,
-        base_points=payload.base_points,
+        base_points=points,
+        verification_method=analysis.verification_method,
     )
     db.add(routine)
     db.commit()

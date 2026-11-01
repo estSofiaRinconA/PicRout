@@ -26,6 +26,22 @@ class Settings(BaseSettings):
 
     ADMIN_EMAILS: str = "admin@picrout.app"
 
+    # --- IA (prioridad: gratis primero) ---
+    # true = usar LLM cloud si hay alguna key; false = solo heurísticas locales
+    AI_USE_LLM: bool = True
+
+    # 1) Groq – GRATIS (recomendado). Key en https://console.groq.com/keys
+    GROQ_API_KEY: str = ""
+    GROQ_MODEL: str = "llama-3.1-8b-instant"
+
+    # 2) Google Gemini – GRATIS (AI Studio). Key en https://aistudio.google.com/apikey
+    GEMINI_API_KEY: str = ""
+    GEMINI_MODEL: str = "gemini-2.5-flash"
+
+    # 3) xAI / Grok – opcional (suele requerir créditos)
+    XAI_API_KEY: str = ""
+    XAI_MODEL: str = "grok-4"
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

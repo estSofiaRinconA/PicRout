@@ -91,8 +91,14 @@ uvicorn App.main:app --reload
   - Estados: pendiente / falta_verificacion / completada / incompleta / perdida
   - Racha solo si se completan TODAS las del día + bonus de puntos
   - Idempotencia de racha (`last_streak_date`)
-- [ ] Motor de IA
-- [ ] Verificación
+- [x] Motor de IA + Verificación (rama `feature/ai-verification`)
+  - Análisis de nombre/descripción → método (`single_photo` | `before_after` | `quiz`) + puntos
+  - IA **gratis** por defecto (heurísticas) + opcional **Groq/Gemini free** o xAI
+  - Asignación automática al crear rutina
+  - Intentos de verificación (`VerificationAttempt`)
+  - Subida de fotos (única o antes/después) + visión Grok opcional
+  - Quiz generado por Grok o plantillas (umbral 60 %)
+  - Puntos y racha al aprobar
 - [ ] Tienda
 - [ ] Red social
 - [ ] Panel de administración
@@ -123,5 +129,17 @@ uvicorn App.main:app --reload
 | DELETE | `/routines/{id}` | Soft-delete |
 | PATCH | `/routines/occurrences/{id}/status` | Cambiar estado (+ puntos/racha) |
 | POST | `/routines/evaluate-today` | Forzar evaluación del día |
+
+## Endpoints de verificación IA (Paso 3)
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| POST | `/verification/analyze` | Previsualizar método + puntos (sin guardar) |
+| POST | `/verification/{occurrence_id}/start` | Iniciar verificación (genera quiz si aplica) |
+| POST | `/verification/attempts/{id}/photo` | Subir foto(s) y cerrar intento |
+| POST | `/verification/attempts/{id}/quiz` | Enviar respuestas del quiz |
+| GET | `/verification/attempts/{id}` | Estado / resultado del intento |
+
+Al crear una rutina (`POST /routines`) la IA asigna automáticamente `verification_method` y `base_points`.
 
 Documentación interactiva: http://127.0.0.1:8000/docs

@@ -64,6 +64,7 @@ def _to_public(attempt: VerificationAttempt) -> VerificationAttemptPublic:
         quiz_score=attempt.quiz_score,
         confidence=attempt.confidence,
         result_message=attempt.result_message,
+        reason=attempt.ai_reason,
         points_awarded=attempt.points_awarded,
         created_at=attempt.created_at,
         completed_at=attempt.completed_at,
@@ -227,6 +228,7 @@ async def upload_photos(
         current_streak=current_user.current_streak,
         points=current_user.points,
         message=msg,
+        reason=attempt.ai_reason,
     )
 
 
@@ -271,6 +273,7 @@ def submit_quiz(
         current_streak=current_user.current_streak,
         points=current_user.points,
         message=msg,
+        reason=attempt.ai_reason,
     )
 
 

@@ -132,6 +132,12 @@ def submit_photos(
     if attempt.status in (ATTEMPT_PASSED, ATTEMPT_FAILED):
         raise ValueError("Este intento ya fue cerrado.")
 
+    routine = attempt.routine
+    if routine is None:
+        routine = db.query(Routine).filter(Routine.id == attempt.routine_id).first()
+    routine_name = routine.name if routine else ""
+    routine_description = routine.description if routine else None
+
     if attempt.method == "single_photo":
         if not single_relative:
             raise ValueError("Se requiere una foto para este método.")
@@ -139,7 +145,8 @@ def submit_photos(
         result = validate_photo_evidence(
             "single_photo",
             single_path=str(absolute_path(single_relative)),
-            routine_name=attempt.routine.name if attempt.routine else "",
+            routine_name=routine_name,
+            routine_description=routine_description,
             max_size_mb=settings.MAX_PHOTO_SIZE_MB,
         )
     elif attempt.method == "before_after":
@@ -151,7 +158,8 @@ def submit_photos(
             "before_after",
             before_path=str(absolute_path(before_relative)),
             after_path=str(absolute_path(after_relative)),
-            routine_name=attempt.routine.name if attempt.routine else "",
+            routine_name=routine_name,
+            routine_description=routine_description,
             max_size_mb=settings.MAX_PHOTO_SIZE_MB,
         )
     else:
@@ -159,8 +167,8 @@ def submit_photos(
 
     attempt.confidence = result.confidence
     attempt.result_message = result.message
-    attempt.ai_reason = result.details
-    attempt.status = ATTEMPT_IN_PROGRESS
+    # Razón completa: detalle del validador (+ umbral si aplica)
+    base_reason = (result.details or result.message or "").strip()
 
     occurrence = attempt.occurrence
     if occurrence is None:
@@ -173,6 +181,10 @@ def submit_photos(
     if result.accepted and result.confidence >= PHOTO_PASS_THRESHOLD:
         attempt.status = ATTEMPT_PASSED
         attempt.completed_at = datetime.now(timezone.utc)
+        attempt.ai_reason = base_reason or (
+            f"Evidencia fotográfica aceptada para «{routine_name}» "
+            f"(confianza {int((result.confidence or 0) * 100)}%)."
+        )
         if occurrence:
             occurrence.status = STATUS_COMPLETED
             award_completion_points(db, user, occurrence)
@@ -181,6 +193,21 @@ def submit_photos(
     else:
         attempt.status = ATTEMPT_FAILED
         attempt.completed_at = datetime.now(timezone.utc)
+        if not result.accepted:
+            attempt.ai_reason = base_reason or "La evidencia no fue aceptada."
+            if not attempt.result_message:
+                attempt.result_message = "Foto rechazada."
+        else:
+            # Archivo OK pero confianza por debajo del umbral
+            attempt.result_message = (
+                f"Foto rechazada: confianza insuficiente "
+                f"({int((result.confidence or 0) * 100)}% < {int(PHOTO_PASS_THRESHOLD * 100)}%)."
+            )
+            attempt.ai_reason = (
+                f"{base_reason} "
+                f"Además, la confianza ({int((result.confidence or 0) * 100)}%) "
+                f"está por debajo del mínimo requerido ({int(PHOTO_PASS_THRESHOLD * 100)}%)."
+            ).strip()
         if occurrence and occurrence.status != STATUS_COMPLETED:
             occurrence.status = STATUS_INCOMPLETE
 
@@ -215,8 +242,11 @@ def submit_quiz_answers(
     attempt.quiz_answers = {str(k): v for k, v in answers.items()}
     attempt.quiz_score = score
     attempt.confidence = score
-    attempt.result_message = f"Respondiste {correct}/{total} correctamente ({int(score * 100)}%)."
-    attempt.ai_reason = f"Umbral de aprobación: {int(QUIZ_PASS_THRESHOLD * 100)}%."
+    pct = int(score * 100)
+    threshold_pct = int(QUIZ_PASS_THRESHOLD * 100)
+    attempt.result_message = (
+        f"Respondiste {correct}/{total} correctamente ({pct}%)."
+    )
 
     occurrence = attempt.occurrence
     if occurrence is None:
@@ -229,6 +259,10 @@ def submit_quiz_answers(
     if score >= QUIZ_PASS_THRESHOLD:
         attempt.status = ATTEMPT_PASSED
         attempt.completed_at = datetime.now(timezone.utc)
+        attempt.ai_reason = (
+            f"Quiz aprobado porque acertaste {correct} de {total} preguntas ({pct}%), "
+            f"igual o por encima del mínimo requerido ({threshold_pct}%)."
+        )
         if occurrence:
             occurrence.status = STATUS_COMPLETED
             award_completion_points(db, user, occurrence)
@@ -237,6 +271,11 @@ def submit_quiz_answers(
     else:
         attempt.status = ATTEMPT_FAILED
         attempt.completed_at = datetime.now(timezone.utc)
+        attempt.ai_reason = (
+            f"Quiz no aprobado porque acertaste {correct} de {total} preguntas ({pct}%), "
+            f"por debajo del mínimo requerido ({threshold_pct}%). "
+            "Intenta de nuevo cuando la ocurrencia lo permita."
+        )
         if occurrence and occurrence.status != STATUS_COMPLETED:
             occurrence.status = STATUS_INCOMPLETE
 

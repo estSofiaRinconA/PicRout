@@ -43,7 +43,8 @@ class VerificationAttemptPublic(BaseModel):
     quiz_questions: list[QuizQuestionPublic] | None = None
     quiz_score: float | None = None
     confidence: float | None = None
-    result_message: str | None = None
+    result_message: str | None = None  # Frase corta (aprobado / rechazado)
+    reason: str | None = None  # Por qué pasó o no (detalle para el usuario)
     points_awarded: int = 0
     created_at: datetime
     completed_at: datetime | None = None
@@ -73,4 +74,5 @@ class VerificationResultResponse(BaseModel):
     occurrence_status: str
     current_streak: int
     points: int
-    message: str
+    message: str  # Resumen corto
+    reason: str | None = None  # Por qué se aprobó o rechazó la verificación

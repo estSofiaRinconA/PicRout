@@ -15,7 +15,7 @@
 PicRout (RoutineAI) es una aplicación móvil Android de seguimiento de hábitos y rutinas respaldada por Inteligencia Artificial. Permite:
 
 - Crear rutinas personalizadas con días, hora y duración.
-- Verificar el cumplimiento mediante **foto única**, **foto antes/después** o **quiz generado por IA**.
+- Verificar el cumplimiento mediante **quiz generado por IA**.
 - Mantener **rachas** diarias (solo si se completan **todas** las rutinas del día).
 - Ganar **puntos** según la dificultad estimada por la IA.
 - Canjear puntos en una **tienda virtual**.
@@ -31,10 +31,10 @@ Este manual explica paso a paso cómo usar la aplicación desde el primer acceso
 | Requisito                    | Detalle                          |
 |-----------------------------|----------------------------------|
 | Sistema operativo           | Android 8.0 (API 26) o superior  |
-| Cámara                      | Trasera funcional (obligatoria)  |
+| Cámara                      | No requerida (verificación solo por quiz) |
 | Conexión a Internet         | Requerida (sincronización + IA)  |
 | Almacenamiento libre        | ≥ 100 MB recomendado             |
-| Permisos                    | Cámara, notificaciones, almacenamiento |
+| Permisos                    | Notificaciones (y almacenamiento si aplica) |
 
 ---
 
@@ -135,18 +135,14 @@ Campos disponibles:
 
 3. Pulsa **Guardar**.
 4. La **IA analiza** nombre + descripción y automáticamente:
-   - Elige el **método de verificación** (`foto única`, `antes/después` o `quiz`).
+   - Usa **quiz** como método de verificación.
    - Asigna un **puntaje base** según dificultad (entre 5 y 30 puntos aprox.).
 
-No hace falta elegir el método a mano: el sistema lo propone al guardar.
+### 6.2 Método de verificación
 
-### 6.2 Métodos de verificación que puede asignar la IA
-
-| Método (en la app)     | Código interno   | Cuándo se usa                         | Ejemplo                        |
-|------------------------|------------------|----------------------------------------|--------------------------------|
-| **Foto única**         | `single_photo`   | Evidencia con una sola imagen          | Llegar al gym, ticket, outfit  |
-| **Foto antes/después** | `before_after`   | Cambio de estado visible               | Limpieza, ordenar, cocinar     |
-| **Quiz**               | `quiz`           | Actividad mental / difícil de fotografiar | Leer, estudiar, meditar     |
+| Método (en la app) | Código interno | Descripción |
+|--------------------|----------------|-------------|
+| **Quiz**           | `quiz`         | La IA genera preguntas sobre la actividad; hay que aprobar ≥ 60 % |
 
 ### 6.3 Estados de una ocurrencia del día
 
@@ -155,7 +151,7 @@ Cada rutina genera una **ocurrencia** por día en el que aplica. Estados:
 | Estado en pantalla     | Código                  | Significado                                      |
 |------------------------|-------------------------|--------------------------------------------------|
 | Pendiente              | `pendiente`             | Aún no se ha intentado verificar                 |
-| Falta verificación     | `falta_verificacion`    | Se inició el proceso; falta foto o quiz          |
+| Falta verificación     | `falta_verificacion`    | Se inició el proceso; falta responder el quiz    |
 | Completada             | `completada`            | Verificación aprobada → suma puntos              |
 | Incompleta             | `incompleta`            | Verificación fallida o abandonada                |
 | Perdida                | `perdida`               | No se realizó a tiempo (afecta la racha)         |
@@ -176,35 +172,20 @@ Cada rutina genera una **ocurrencia** por día en el que aplica. Estados:
 3. Pulsa **Verificar** en la que quieras completar.
 4. La app inicia un **intento de verificación** y te guía según el método.
 
-### 7.2 Flujo según método
+### 7.2 Flujo de quiz
 
-#### A. Foto única
-1. La app pide **una foto**.
-2. Captúrala o elígela de la galería (según permisos).
-3. El sistema valida el archivo (formato, tamaño) y, si hay IA cloud configurada, puede analizar el contenido.
-4. Si la confianza es suficiente → **Completada** + puntos.
-5. Si no → estado **Incompleta**; puedes iniciar otro intento más tarde.
-
-#### B. Foto antes y después
-1. Sube la foto **ANTES**.
-2. Realiza la actividad.
-3. Sube la foto **DESPUÉS**.
-4. El sistema comprueba que sean dos archivos distintos y válidos.
-5. Resultado: Completada o Incompleta.
-
-#### C. Quiz
-1. Al iniciar la verificación, la IA genera **3 preguntas** relacionadas con la actividad (comprensión, hábitos de estudio, etc.).
+1. Al iniciar la verificación, la IA genera **3 preguntas** relacionadas con la actividad.
 2. Responde todas (una opción por pregunta).
 3. Si aciertas al menos el **60 %** → **Completada** + puntos.
-4. Si no alcanzas el umbral → **Incompleta**; puedes volver a intentar (se genera un nuevo intento).
+4. Si no alcanzas el umbral → **Incompleta**; puedes volver a intentar (nuevo intento).
 
-> **Importante:** Las fotos se guardan asociadas al intento (usuario, ocurrencia, fecha). Los puntos solo se otorgan cuando el intento queda en **aprobado**.
+> **Importante:** Los puntos solo se otorgan cuando el intento queda **aprobado**.
 
 ### 7.3 Cómo trabaja la IA por detrás (resumen para el usuario)
 
-- **Sin conexión a un proveedor cloud:** el sistema usa reglas inteligentes en español (palabras clave de limpieza, estudio, ejercicio, etc.). Sigue siendo automático y no requiere configuración.
-- **Con proveedor gratis opcional (p. ej. Groq o Gemini):** el análisis de texto, la generación de quizzes y (si aplica) la revisión de fotos pueden usar un modelo de lenguaje real.
-- Tú solo ves el resultado: método asignado, preguntas o aceptación/rechazo de la evidencia.
+- **Sin conexión a un proveedor cloud:** reglas en español para puntos/dificultad y plantillas de quiz.
+- **Con proveedor gratis opcional (p. ej. Groq o Gemini):** análisis de texto y generación de quizzes con modelo de lenguaje.
+- Tú solo ves las preguntas y el resultado (aprobado / no aprobado).
 
 ---
 
@@ -291,7 +272,7 @@ La recuperación de contraseña siempre está disponible desde la pantalla de lo
 | No llegan notificaciones              | Revisar permisos de notificaciones + batería optimizada                   |
 | La cámara no abre                     | Conceder permiso de cámara y reiniciar la app                             |
 | Código OTP no llega o expiró          | Revisar spam; solicitar un nuevo código (máx. 10 min de validez)          |
-| La IA rechaza mi foto                 | Asegúrate de buena iluminación y que el contenido sea claro; reintenta    |
+| No apruebo el quiz                    | Repasa la actividad y vuelve a intentar; el umbral es 60 % de aciertos    |
 | No me suma la racha                   | Verifica que **todas** las rutinas del día estén en estado Completada     |
 | Error de conexión                     | Comprueba Internet; el backend debe estar online                          |
 

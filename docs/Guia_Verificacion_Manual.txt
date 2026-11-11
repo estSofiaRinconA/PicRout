@@ -1,4 +1,11 @@
 ================================================================================
+
+
+=== NOTA 2026-11-11 ===
+La verificación por fotos (single_photo / before_after) fue ELIMINADA del proyecto.
+Solo queda el flujo de quiz. Ignorar secciones de subida de fotos de esta guía.
+========================
+
   PicRout (RoutineAI) — Guía de Verificación Manual del Backend
   Pasos 1 (Auth) · 2 (Rutinas/Rachas) · 3 (IA y Fotos)
 ================================================================================

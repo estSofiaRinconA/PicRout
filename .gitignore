@@ -8,6 +8,8 @@ env/
 venv/
 .venv/
 ENV/
+env.bak/
+venv.bak/
 *.egg-info/
 dist/
 build/
@@ -27,6 +29,7 @@ app_routines.db
 .vscode/
 *.swp
 *.swo
+*~
 
 # OS
 .DS_Store
@@ -36,7 +39,7 @@ Thumbs.db
 *.log
 logs/
 
-# Storage de fotos (no subir fotos reales)
+# Storage de fotos (no subir las fotos reales)
 backend/storage/uploads/
 backend/storage/temp/
 
@@ -49,3 +52,5 @@ htmlcov/
 # Build
 *.apk
 *.exe
+dist/
+build/

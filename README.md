@@ -38,7 +38,7 @@ PicRout/
 | Capa              | Tecnología                          |
 |-------------------|-------------------------------------|
 | Backend           | Python + FastAPI                    |
-| Base de datos     | SQLite (dev) → PostgreSQL (prod)    |
+| Base de datos     | SQLite (dev) → **Supabase PostgreSQL** (equipo/prod) |
 | Inteligencia Artificial | Motor propio en Python         |
 | Cliente prioritario | Android                           |
 | Post-universidad  | Windows (.exe) y versión HTML (solo pruebas) |
@@ -92,17 +92,17 @@ uvicorn App.main:app --reload
   - Racha solo si se completan TODAS las del día + bonus de puntos
   - Idempotencia de racha (`last_streak_date`)
 - [x] Motor de IA + Verificación (rama `feature/ai-verification`)
-  - Análisis de nombre/descripción → método (`single_photo` | `before_after` | `quiz`) + puntos
+  - Análisis de nombre/descripción → puntos y dificultad (método fijo: **quiz**)
   - IA **gratis** por defecto (heurísticas) + opcional **Groq/Gemini free** o xAI
-  - Asignación automática al crear rutina
-  - Intentos de verificación (`VerificationAttempt`)
-  - Subida de fotos (única o antes/después) + visión Grok opcional
-  - Quiz generado por Grok o plantillas (umbral 60 %)
-  - Puntos y racha al aprobar
+  - Intentos de verificación (`VerificationAttempt`) solo por **quiz**
+  - Quiz generado por LLM o plantillas (umbral 60 %)
+  - Verificación por fotos **eliminada** del proyecto (ERR-002)
+  - Puntos y racha al aprobar el quiz
 - [ ] Tienda
 - [ ] Red social
 - [ ] Panel de administración
 - [ ] Despliegue permanente
+- [x] Preparación BD Supabase (ver `docs/Guia_Supabase.md`)
 
 ## Endpoints de autenticación (Paso 1)
 
@@ -136,7 +136,6 @@ uvicorn App.main:app --reload
 |--------|------|-------------|
 | POST | `/verification/analyze` | Previsualizar método + puntos (sin guardar) |
 | POST | `/verification/{occurrence_id}/start` | Iniciar verificación (genera quiz si aplica) |
-| POST | `/verification/attempts/{id}/photo` | Subir foto(s) y cerrar intento |
 | POST | `/verification/attempts/{id}/quiz` | Enviar respuestas del quiz |
 | GET | `/verification/attempts/{id}` | Estado / resultado del intento |
 

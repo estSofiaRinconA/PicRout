@@ -21,14 +21,12 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str = ""
     SMTP_FROM: str = "noreply@picrout.app"
 
-    STORAGE_PATH: str = "./storage/uploads"
-    MAX_PHOTO_SIZE_MB: int = 10
-
     ADMIN_EMAILS: str = "admin@picrout.app"
 
     # --- IA (prioridad: gratis primero) ---
     # true = usar LLM cloud si hay alguna key; false = solo heurísticas locales
     AI_USE_LLM: bool = True
+    # Verificación activa: solo quiz (fotos eliminadas del proyecto).
 
     # 1) Groq – GRATIS (recomendado). Key en https://console.groq.com/keys
     GROQ_API_KEY: str = ""

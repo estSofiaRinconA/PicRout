@@ -1,16 +1,15 @@
 """
-Schemas Pydantic para verificación de rutinas – Paso 3.
+Schemas Pydantic para verificación de rutinas – Paso 3 (solo quiz).
 """
 
 from datetime import datetime
-from typing import Any
 from pydantic import BaseModel, Field, field_validator
 
 
 class AnalysisPreview(BaseModel):
     """Resultado del análisis de nombre + descripción (sin crear rutina)."""
 
-    verification_method: str
+    verification_method: str  # siempre "quiz"
     base_points: int
     difficulty: str
     reason: str
@@ -33,18 +32,13 @@ class VerificationAttemptPublic(BaseModel):
     id: int
     occurrence_id: int
     routine_id: int
-    method: str
+    method: str  # quiz
     status: str  # pending | in_progress | passed | failed | expired
-    # Fotos (rutas relativas; el cliente puede construir URL si se sirven estáticos)
-    photo_single_path: str | None = None
-    photo_before_path: str | None = None
-    photo_after_path: str | None = None
-    # Quiz: solo preguntas + opciones (sin respuesta correcta)
     quiz_questions: list[QuizQuestionPublic] | None = None
     quiz_score: float | None = None
     confidence: float | None = None
-    result_message: str | None = None  # Frase corta (aprobado / rechazado)
-    reason: str | None = None  # Por qué pasó o no (detalle para el usuario)
+    result_message: str | None = None
+    reason: str | None = None
     points_awarded: int = 0
     created_at: datetime
     completed_at: datetime | None = None
@@ -74,5 +68,5 @@ class VerificationResultResponse(BaseModel):
     occurrence_status: str
     current_streak: int
     points: int
-    message: str  # Resumen corto
-    reason: str | None = None  # Por qué se aprobó o rechazó la verificación
+    message: str
+    reason: str | None = None

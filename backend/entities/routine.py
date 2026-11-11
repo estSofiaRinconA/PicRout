@@ -76,8 +76,7 @@ class Routine(Base):
     # Puntos base (la IA podrá ajustarlos en el Paso 3)
     base_points: Mapped[int] = mapped_column(Integer, default=10, server_default="10")
 
-    # Método de verificación (lo definirá la IA en el siguiente paso)
-    # single_photo | before_after | quiz | none
+    # Método de verificación (único activo: quiz)
     verification_method: Mapped[str | None] = mapped_column(String(30), nullable=True)
 
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="1")

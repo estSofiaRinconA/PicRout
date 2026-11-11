@@ -9,15 +9,12 @@ Orden de prioridad:
 
 Solo texto por chat/completions estilo OpenAI (Groq y xAI).
 Gemini usa su endpoint generateContent.
-Visión: solo si el proveedor lo soporta; si no, fallback heurístico de fotos.
 """
 
 from __future__ import annotations
 
-import base64
 import json
 import logging
-from pathlib import Path
 from typing import Any, Literal
 
 import httpx
@@ -228,55 +225,3 @@ def chat_completion_json(
     if start != -1 and end != -1 and end > start:
         text = text[start : end + 1]
     return json.loads(text)
-
-
-def image_to_data_url(path: str | Path) -> str:
-    p = Path(path)
-    suffix = p.suffix.lower()
-    mime = {
-        ".jpg": "image/jpeg",
-        ".jpeg": "image/jpeg",
-        ".png": "image/png",
-        ".webp": "image/webp",
-    }.get(suffix, "image/jpeg")
-    b64 = base64.b64encode(p.read_bytes()).decode("ascii")
-    return f"data:{mime};base64,{b64}"
-
-
-def vision_completion(
-    prompt: str,
-    image_paths: list[str | Path],
-    *,
-    system: str | None = None,
-    temperature: float = 0.2,
-    max_tokens: int = 800,
-) -> str:
-    """
-    Visión multimodal.
-    - Groq: solo si el modelo lo soporta (muchos free son texto).
-    - xAI: soporta image_url en chat/completions.
-    - Gemini: se puede ampliar después; por ahora lanzamos y el caller hace fallback.
-    """
-    provider = get_active_provider()
-    content: list[dict[str, Any]] = []
-    for path in image_paths:
-        content.append(
-            {
-                "type": "image_url",
-                "image_url": {"url": image_to_data_url(path), "detail": "high"},
-            }
-        )
-    content.append({"type": "text", "text": prompt})
-
-    messages: list[dict[str, Any]] = []
-    if system:
-        messages.append({"role": "system", "content": system})
-    messages.append({"role": "user", "content": content})
-
-    if provider in ("xai", "groq"):
-        # Groq vision depende del modelo; si falla, el caller captura
-        return chat_completion(messages, temperature=temperature, max_tokens=max_tokens)
-
-    raise RuntimeError(
-        f"Visión no disponible con proveedor '{provider}'. Usa validación heurística."
-    )

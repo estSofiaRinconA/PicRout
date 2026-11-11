@@ -1,6 +1,13 @@
 """
 Configuración de la base de datos (SQLAlchemy).
-SQLite en desarrollo → PostgreSQL en producción (cambiar DATABASE_URL).
+
+- Desarrollo local: SQLite (por defecto) → sqlite:///./app_routines.db
+- Producción / equipo: PostgreSQL en Supabase → DATABASE_URL en .env
+
+Ejemplo Supabase (URI de conexión, modo Session / Transaction pooler):
+  postgresql+psycopg2://postgres.[PROJECT_REF]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres
+o conexión directa:
+  postgresql+psycopg2://postgres:[PASSWORD]@db.[PROJECT_REF].supabase.co:5432/postgres
 """
 
 from sqlalchemy import create_engine
@@ -11,14 +18,18 @@ settings = get_settings()
 
 # check_same_thread=False es necesario para SQLite con FastAPI
 connect_args = {}
+engine_kwargs: dict = {"echo": settings.DEBUG}
+
 if settings.DATABASE_URL.startswith("sqlite"):
     connect_args = {"check_same_thread": False}
+    engine_kwargs["connect_args"] = connect_args
+else:
+    # Postgres / Supabase: pool razonable para API pequeña
+    engine_kwargs["pool_pre_ping"] = True
+    engine_kwargs["pool_size"] = 5
+    engine_kwargs["max_overflow"] = 10
 
-engine = create_engine(
-    settings.DATABASE_URL,
-    connect_args=connect_args,
-    echo=settings.DEBUG,
-)
+engine = create_engine(settings.DATABASE_URL, **engine_kwargs)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

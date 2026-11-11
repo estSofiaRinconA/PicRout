@@ -12,4 +12,4 @@ httpx==0.27.2
 aiofiles==24.1.0
 email-validator==2.2.0
 # PostgreSQL / Supabase (producción). SQLite no requiere driver extra.
-#psycopg2-binary==2.9.9
+psycopg2-binary==2.9.9

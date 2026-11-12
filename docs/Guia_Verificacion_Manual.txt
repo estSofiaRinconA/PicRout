@@ -1,499 +1,101 @@
-================================================================================
+PicRout — Guía de verificación manual del backend
+Versión: 2.0 · Fecha: 2026-11-11
+Ámbito: FastAPI, PostgreSQL Supabase, autenticación tradicional y Google, rutinas/rachas, IA por quiz.
 
+IMPORTANTE: la verificación por fotos (single_photo/before_after) fue RETIRADA el 11/11/2026.
+No probar endpoints /photo ni exigir evidencias fotográficas. La tienda, red social, notificaciones y cliente Android no se dan por implementados en esta guía.
 
-=== NOTA 2026-11-11 ===
-La verificación por fotos (single_photo / before_after) fue ELIMINADA del proyecto.
-Solo queda el flujo de quiz. Ignorar secciones de subida de fotos de esta guía.
-========================
+0. ENTORNO
+-----------
+- Seleccionar rama correcta (desarrollo Google: feature/google-signin).
+- Desde la carpeta backend: `python -m pip install -r requirements.txt`
+- Archivo backend/.env con credenciales privadas del proyecto Supabase compartido.
+- Ejecutar: `python -m uvicorn App.main:app --reload`
+- Abrir http://127.0.0.1:8000/docs
+- Nunca copiar tokens ni contraseñas a un informe público.
 
-  PicRout (RoutineAI) — Guía de Verificación Manual del Backend
-  Pasos 1 (Auth) · 2 (Rutinas/Rachas) · 3 (IA y Fotos)
-================================================================================
-  Equipo: Sofía Rincón · Juan Pablo Zárate · Sofía Bautista
-  Profesor: Freddy León Reyes
-  Universidad Militar Nueva Granada — Ingeniería de Software
-  Fecha: 1 de noviembre de 2026
-================================================================================
+1. SALUD Y BASE DE DATOS
+------------------------
+[ ] GET /health -> HTTP 200.
+[ ] Registrar usuario nuevo (ver sección 2).
+[ ] Comprobar `username` nuevo en `public.users` mediante SQL Editor.
+[ ] Reiniciar backend; login del mismo usuario continúa operativo.
+NOTA: /health por sí solo no prueba conexión PostgreSQL.
 
-CÓMO SE UTILIZA ESTA GUÍA
--------------------------
-1. Levanta el backend (sección 0).
-2. Abre http://127.0.0.1:8000/docs (Swagger UI).
-3. Sigue los pasos en orden (1 → 5).
-4. Marca cada casilla [ ] cuando el resultado coincida con lo esperado.
-5. Si algo falla, anota el código HTTP y el mensaje de error.
-6. Al final, usa el resumen para decidir si el paso está aprobado.
+2. AUTENTICACIÓN TRADICIONAL
+---------------------------
+POST /auth/register:
+{
+  "email": "prueba_documentacion@example.com",
+  "username": "prueba_documentacion",
+  "display_name": "Prueba Documentación",
+  "password": "ClaveDePrueba2026!"
+}
+[ ] Respuesta de éxito (según esquema Swagger).
+[ ] Correo y nombre de usuario duplicados rechazados, sin duplicar filas.
 
+POST /auth/login:
+{"identifier":"prueba_documentacion","password":"ClaveDePrueba2026!"}
+[ ] 200 y access_token de PicRout.
+[ ] Contraseña incorrecta -> 401.
+[ ] GET /auth/me con autorización -> 200 y usuario correcto.
+[ ] PUT /auth/me funciona según campos declarados en Swagger.
+[ ] Solicitar OTP de recuperación (6 dígitos, un uso, 10 minutos), restablecer contraseña y rechazar reutilización.
+NOTA: con SMTP no configurado puede ser modo desarrollo; no declarar envío real por correo sin comprobarlo.
 
-================================================================================
-0. PREPARAR EL ENTORNO
-================================================================================
+3. GOOGLE SIGN-IN (SUPABASE AUTH)
+---------------------------------
+Requisitos externos: proveedor Google habilitado en el proyecto Supabase compartido; callback en Google Cloud; URL de retorno local autorizada para la prueba web; cuenta en Test users si aplica.
 
-Comandos (desde la carpeta PicRout/backend):
+[ ] POST /auth/google pide `access_token`, no `id_token`.
+[ ] {"access_token":"token_falso_de_prueba"} -> 401; no crea cuenta.
+[ ] Página temporal de prueba OAuth en http://127.0.0.1:5500/google-test.html completa Google OAuth y obtiene sesión de Supabase.
+[ ] POST /auth/google con el access_token **real de Supabase** -> 200 y JWT de PicRout.
+[ ] Se creó cuenta en public.users con google_id no nulo y sin contraseña local.
+[ ] Segundo POST /auth/google -> mismo ID, no crea duplicados.
+[ ] Cuenta tradicional que coincide por correo -> 409 controlado; no vinculación automática.
+[ ] Usuario desactivado -> 403 (pendiente de prueba si no hay caso autorizado).
+[ ] Tokens expirados / proyecto equivocado -> rechazo (pendiente de prueba).
+Nunca incluir tokens reales en informes ni usar la API `auth.users` como sustituto de `public.users`.
 
-  python -m venv venv
+Consulta SQL solo lectura:
+SELECT id, email, username, google_id
+FROM public.users
+WHERE google_id IS NOT NULL;
 
-  # Windows:
-  venv\Scripts\activate
+4. RUTINAS, OCURRENCIAS Y RACHA
+------------------------------
+Con autorización PicRout:
+[ ] POST /routines crea rutina (nombre, descripción, días, hora, duración), revisar esquema Swagger.
+[ ] GET /routines lista la nueva rutina.
+[ ] GET /routines/{id} devuelve rutina creada.
+[ ] PUT /routines/{id} modifica campos admitidos.
+[ ] Desactivar rutina según endpoint actual: desaparece de listados activos y persiste.
+[ ] GET /routines/today devuelve ocurrencias correspondientes al día.
+[ ] GET /routines/streak devuelve estado coherente.
+[ ] Completar una ocurrencia otorga puntos solo una vez.
+[ ] Completar todas las ocurrencias del día permite actualizar racha.
+[ ] Reevaluar mismo día NO repite racha ni bonus (idempotencia).
 
-  # macOS / Linux:
-  source venv/bin/activate
+5. VERIFICACIÓN POR QUIZ
+------------------------
+[ ] POST /verification/analyze con nombre/descripcion -> método `quiz`, dificultad/puntos coherentes.
+[ ] POST /verification/{occurrence_id}/start inicia intento quiz y cambia estado según API.
+[ ] Responder mediante POST /verification/attempts/{attempt_id}/quiz con las respuestas esperadas por Swagger.
+[ ] Aprobación según umbral configurado, actualización de ocurrencia y puntos.
+[ ] Rechazo/resultado fallido del quiz se refleja correctamente.
+[ ] GET /verification/attempts/{attempt_id} permite consultar resultado.
+NO realizar pruebas de fotos: fueron eliminadas del proyecto.
 
-  pip install -r requirements.txt
-  # Si bcrypt da error: pip install "bcrypt==4.0.1"
-
-  copy .env.example .env          # Windows
-  # cp .env.example .env          # macOS / Linux
-
-  uvicorn App.main:app --reload --host 127.0.0.1 --port 8000
-
-Comprobar:
-  - Navegador: http://127.0.0.1:8000/health
-  - Debe responder: {"status":"ok"}
-  - Documentación: http://127.0.0.1:8000/docs
-
-En Swagger:
-  - Tras el login, pulsa "Authorize".
-  - Escribe: Bearer <tu_access_token>
-  - Confirma. Todos los endpoints protegidos usarán ese token.
-
-
-================================================================================
-1. AUTENTICACIÓN (PASO 1)
-================================================================================
-
-1.1 Registro
+6. RESULTADO
 ------------
-Endpoint: POST /auth/register
-Body (JSON):
-{
-  "email": "sofia@picrout.app",
-  "username": "sofia",
-  "password": "ClaveSegura123",
-  "display_name": "Sofía Rincón"
-}
-
-Esperado: 201, access_token y datos del usuario.
-[ ] OK
-
-Guarda el access_token. Lo usarás en Authorize.
-
-
-1.2 Login con correo
---------------------
-Endpoint: POST /auth/login
-Body:
-{
-  "identifier": "sofia@picrout.app",
-  "password": "ClaveSegura123"
-}
-
-Esperado: 200 + access_token
-[ ] OK
-
-
-1.3 Login con username
-----------------------
-Body:
-{
-  "identifier": "sofia",
-  "password": "ClaveSegura123"
-}
-
-Esperado: 200 + access_token
-[ ] OK
-
-
-1.4 Login con contraseña incorrecta
------------------------------------
-Body:
-{
-  "identifier": "sofia",
-  "password": "mala"
-}
-
-Esperado: 401
-[ ] OK
-
-
-1.5 Perfil — consultar
-----------------------
-Authorize con el token.
-Endpoint: GET /auth/me
-
-Esperado: 200, username = sofia
-[ ] OK
-
-
-1.6 Perfil — actualizar
------------------------
-Endpoint: PUT /auth/me
-Body:
-{
-  "display_name": "Sofía R.",
-  "bio": "Probando PicRout",
-  "theme": "dark",
-  "color": "#10B981"
-}
-
-Esperado: 200, bio y color actualizados
-[ ] OK
-
-
-1.7 Recuperación de contraseña (OTP)
-------------------------------------
-a) POST /auth/forgot-password
-Body:
-{ "email": "sofia@picrout.app" }
-
-Esperado: 200, mensaje genérico.
-En la CONSOLA del servidor debe aparecer el código de 6 dígitos, por ejemplo:
-  [DEV] OTP para sofia@picrout.app: 649488
-[ ] OK (mensaje API)
-[ ] OK (código visible en consola)
-
-b) POST /auth/reset-password
-Body:
-{
-  "email": "sofia@picrout.app",
-  "code": "649488",
-  "new_password": "NuevaClave456"
-}
-
-Esperado: 200, contraseña actualizada
-[ ] OK
-
-c) Login con la nueva contraseña
-[ ] OK
-
-d) Reutilizar el mismo código OTP
-Esperado: 400 (código de un solo uso)
-[ ] OK
-
-
-1.8 Google Sign-In (estructura)
--------------------------------
-POST /auth/google
-Body: { "id_token": "cualquier_texto" }
-
-Esperado: 501 (aún no implementado del todo)
-[ ] OK
-
-
-1.9 Email duplicado
--------------------
-POST /auth/register con el mismo email otra vez.
-
-Esperado: 400
-[ ] OK
-
-
-================================================================================
-2. RUTINAS Y RACHAS (PASO 2)
-================================================================================
-
-Crea tres rutinas (una por tipo de verificación). days_of_week: 0=Lunes … 6=Domingo.
-Usa [0,1,2,3,4,5,6] para que apliquen HOY.
-
-2.1 Rutina foto única
----------------------
-POST /routines
-{
-  "name": "Hacer la cama",
-  "description": "Tender la cama al despertar",
-  "days_of_week": [0, 1, 2, 3, 4, 5, 6],
-  "scheduled_time": "07:00:00",
-  "duration_minutes": 5
-}
-
-Esperado: 201
-  verification_method ≈ single_photo
-  base_points bajos (aprox. 5–8)
-[ ] OK
-Anota routine_id: ________
-
-
-2.2 Rutina antes/después
-------------------------
-POST /routines
-{
-  "name": "Limpiar escritorio",
-  "description": "Organizar y limpiar el escritorio de trabajo",
-  "days_of_week": [0, 1, 2, 3, 4, 5, 6],
-  "scheduled_time": "18:00:00",
-  "duration_minutes": 20
-}
-
-Esperado: 201, verification_method ≈ before_after
-[ ] OK
-Anota routine_id: ________
-
-
-2.3 Rutina quiz
----------------
-POST /routines
-{
-  "name": "Estudiar algoritmos",
-  "description": "Repasar grafos y árboles de decisión durante 1 hora",
-  "days_of_week": [0, 1, 2, 3, 4, 5, 6],
-  "scheduled_time": "09:00:00",
-  "duration_minutes": 60
-}
-
-Esperado: 201, verification_method ≈ quiz, puntos altos
-[ ] OK
-Anota routine_id: ________
-
-
-2.4 Listar rutinas
-------------------
-GET /routines
-
-Esperado: 200, al menos 3 rutinas
-[ ] OK
-
-
-2.5 Ocurrencias de hoy
-----------------------
-GET /routines/today
-
-Esperado: 200, 3 ocurrencias en estado "pendiente"
-[ ] OK
-Anota occurrence_id de cada una:
-  - Hacer la cama: ________
-  - Limpiar escritorio: ________
-  - Estudiar algoritmos: ________
-
-
-2.6 Racha inicial
------------------
-GET /routines/streak
-
-Esperado: current_streak = 0, points = 0 (o solo puntos si marcaste algo antes)
-[ ] OK
-
-
-2.7 Marcar una como completada (sin IA)
----------------------------------------
-PATCH /routines/occurrences/{occurrence_id}/status
-Body:
-{ "status": "completada" }
-
-Esperado: 200, points_awarded > 0
-La racha NO sube hasta completar TODAS las del día.
-[ ] OK
-
-
-================================================================================
-3. ANÁLISIS IA (PASO 3 — PREVIO)
-================================================================================
-
-POST /verification/analyze
-{
-  "name": "Leer 20 páginas",
-  "description": "Leer un capítulo del libro de diseño de software"
-}
-
-Esperado: 200
-  verification_method = quiz (o coherente)
-  base_points entre 5 y 30
-  difficulty y reason presentes
-[ ] OK
-
-Pruebas rápidas opcionales:
-  - "Llegar al gym"     → single_photo
-  - "Ordenar el closet" → before_after
-[ ] OK (opcional)
-
-
-================================================================================
-4. VERIFICACIÓN COMPLETA: QUIZ, FOTO ÚNICA Y ANTES/DESPUÉS
-================================================================================
-
-4.1 Iniciar verificación (común a los tres)
--------------------------------------------
-POST /verification/{occurrence_id}/start
-
-Esperado: 201
-  method = single_photo | before_after | quiz
-  Si es quiz: quiz_questions con 3 preguntas (sin correct_index)
-  La ocurrencia pasa a "falta_verificacion"
-[ ] OK start foto única
-[ ] OK start before_after
-[ ] OK start quiz
-
-Anota attempt_id de cada una:
-  - single_photo: ________
-  - before_after: ________
-  - quiz: ________
-
-
-4.2 Caso FOTO ÚNICA
--------------------
-POST /verification/attempts/{attempt_id}/photo
-Tipo: multipart/form-data
-Campo: photo = archivo .jpg / .png / .webp real (mayor a 1 KB)
-
-En Swagger: Try it out → elige el archivo en "photo" → Execute.
-
-Esperado: 200
-  attempt.status = passed (si el archivo es válido)
-  occurrence_status = completada
-  puntos actualizados
-[ ] OK
-
-Negativos:
-  - Sin archivo → 400
-  - Archivo vacío o muy pequeño → 400
-  - Extensión no permitida (.txt) → 400
-[ ] OK negativos
-
-
-4.3 Caso ANTES / DESPUÉS
-------------------------
-POST /verification/attempts/{attempt_id}/photo
-Campos:
-  photo_before = imagen 1
-  photo_after  = imagen 2
-
-Esperado: 200, status = passed, ocurrencia completada
-[ ] OK
-
-Negativo: enviar solo una de las dos → 400
-[ ] OK negativo
-
-
-4.4 Caso QUIZ
--------------
-Tras el start, copia las preguntas de la respuesta.
-
-POST /verification/attempts/{attempt_id}/quiz
-Body ejemplo:
-{
-  "answers": {
-    "0": 1,
-    "1": 0,
-    "2": 2
-  }
-}
-
-(0 = primera opción de la pregunta 0, etc.)
-
-Esperado:
-  - Si aciertas ≥ 60 % → status = passed, ocurrencia completada
-  - Si fallas → status = failed
-[ ] OK quiz (al menos un intento)
-
-GET /verification/attempts/{attempt_id}
-Revisa quiz_score y result_message
-[ ] OK
-
-
-4.5 Cómo subir fotos con curl (alternativa a Swagger)
------------------------------------------------------
-Foto única:
-  curl -X POST "http://127.0.0.1:8000/verification/attempts/1/photo" \
-    -H "Authorization: Bearer TU_TOKEN" \
-    -F "photo=@C:/ruta/foto.jpg"
-
-Antes y después:
-  curl -X POST "http://127.0.0.1:8000/verification/attempts/2/photo" \
-    -H "Authorization: Bearer TU_TOKEN" \
-    -F "photo_before=@C:/ruta/antes.jpg" \
-    -F "photo_after=@C:/ruta/despues.jpg"
-
-
-================================================================================
-5. RACHA DEL DÍA COMPLETO
-================================================================================
-
-Cuando TODAS las ocurrencias de hoy estén en "completada":
-
-1) GET /routines/today
-   → completed debe ser igual al total de ocurrencias
-   [ ] OK
-
-2) GET /routines/streak
-   o POST /routines/evaluate-today
-
-Esperado:
-  - current_streak aumenta en 1
-  - se suman puntos de bonus por racha
-  - si evalúas otra vez el mismo día, NO vuelve a sumar (idempotencia)
-[ ] OK racha
-[ ] OK no dobla racha al reevaluar
-
-
-================================================================================
-6. CHECKLIST RESUMEN
-================================================================================
-
-Auth
-[ ] Register
-[ ] Login email / username
-[ ] Login incorrecto → 401
-[ ] GET /me y PUT perfil
-[ ] Forgot + Reset OTP (código en consola)
-[ ] OTP reutilizado → error
-[ ] Google → 501
-[ ] Email duplicado → 400
-
-Rutinas
-[ ] Crear 3 rutinas (single / before_after / quiz)
-[ ] IA asigna method + points al crear
-[ ] GET /routines y GET /today
-[ ] PATCH status completada
-[ ] GET /streak
-
-IA y verificación
-[ ] POST /verification/analyze
-[ ] Start verificación
-[ ] Foto única válida → passed
-[ ] Foto inválida → 400
-[ ] Antes + después → passed
-[ ] Solo una foto en before_after → 400
-[ ] Quiz aprobado (≥60 %) y fallido
-[ ] GET attempt por id
-
-Racha
-[ ] Completar todas → racha +1 y bonus
-[ ] Reevaluar día → no dobla racha
-
-
-================================================================================
-7. NOTAS IMPORTANTES
-================================================================================
-
-- Días de la semana: 0 = Lunes, 1 = Martes, …, 6 = Domingo.
-- Sin API key de IA (GROQ / GEMINI / XAI), el análisis usa heurísticas locales
-  y las fotos se validan por tipo, tamaño y existencia (no visión profunda).
-- Con SMTP vacío, el OTP solo se imprime en la consola del backend (modo dev).
-- Fotos permitidas: JPEG, PNG, WebP. Máximo según MAX_PHOTO_SIZE_MB en .env
-  (por defecto 10 MB). Mínimo aproximado: no vacías (> 1 KB).
-- Las fotos se guardan en STORAGE_PATH (ver .env), subcarpeta verifications/.
-- Token JWT: en Swagger → Authorize → "Bearer <token>" (incluye la palabra Bearer).
-
-
-================================================================================
-8. RESULTADO DE ESTA VERIFICACIÓN
-================================================================================
-
-Fecha: _______________
-Quién verificó: _______________
-Servidor / rama: _______________
-
-Total checks OK: ____ / ____
-Fallos (anotar endpoint + código + mensaje):
-  -
-  -
-  -
-
-Conclusión:
-[ ] Paso 1 Auth aprobado
-[ ] Paso 2 Rutinas/Rachas aprobado
-[ ] Paso 3 IA y verificación aprobado
-[ ] Listo para commit / merge y Paso 4 (Tienda)
-
-================================================================================
-  Fin de la guía — PicRout / RoutineAI
-================================================================================
+Fecha: __________  Rama: __________  Responsable: __________
+Backend: [ ] OK [ ] Falló
+Base Supabase: [ ] OK [ ] Falló
+Auth tradicional: [ ] OK [ ] Falló
+Google real: [ ] OK [ ] Falló
+Rutinas + racha: [ ] OK [ ] Falló
+Quiz: [ ] OK [ ] Falló
+Incidencias (código HTTP y mensaje, SIN credenciales): ____________________
+Conclusión: [ ] Aprobación funcional parcial [ ] Aprobación de pruebas descritas
+Recordatorio: aprobar estas pruebas manuales no equivale a auditoría de seguridad ni disponibilidad de Android.

@@ -1,7 +1,7 @@
 # Manual de Usuario – PicRout (RoutineAI)
 
-**Versión:** 1.1  
-**Fecha:** 1 de noviembre de 2026  
+**Versión:** 1.2 — documentación del backend validado y funciones previstas  
+**Fecha:** 11 de noviembre de 2026  
 **Equipo:** Sofía Rincón Álvarez · Juan Pablo Zárate Fernández · Sofía Bautista Díaz  
 **Profesor:** Freddy León Reyes  
 **Universidad Militar Nueva Granada – Ingeniería de Software**
@@ -22,7 +22,7 @@ PicRout (RoutineAI) es una aplicación móvil Android de seguimiento de hábitos
 - Compartir rachas, evidencias y chats en una **red social** interna.
 - Recibir notificaciones de recordatorio e interacciones.
 
-Este manual explica paso a paso cómo usar la aplicación desde el primer acceso hasta las funciones avanzadas.
+Este manual describe el uso previsto de PicRout y distingue lo **probado en backend** de lo **pendiente en Android**. Las pantallas, tienda, red social, notificaciones y APK se describen como funciones planificadas mientras no haya una prueba específica de su implementación.
 
 ---
 
@@ -38,13 +38,13 @@ Este manual explica paso a paso cómo usar la aplicación desde el primer acceso
 
 ---
 
-## 3. Instalación
+## 3. Instalación (flujo previsto de Android)
 
 1. Abre en el navegador del teléfono la página de descarga de PicRout (landing HTML).
 2. Descarga el archivo **APK**.
-3. Si Android bloquea la instalación, ve a **Ajustes → Seguridad** (o el navegador usado) y habilita **“Instalar apps de orígenes desconocidos”**.
+3. Cuando exista un APK oficial, sigue las instrucciones de instalación publicadas por el equipo y verifica la procedencia del archivo.
 4. Abre el APK e instala.
-5. Al abrir la app por primera vez, concede los permisos de **cámara** y **notificaciones**.
+5. Al abrir la app, configura los permisos de **notificaciones** que solicite; la verificación actual es solo por quiz y no requiere cámara.
 
 > **Nota para desarrolladores:** el backend se levanta con FastAPI. Ver `README.md` del repositorio.
 
@@ -79,15 +79,21 @@ Al abrir la app aparece la pantalla de bienvenida con tres opciones principales:
 
 ### 4.4 Inicio de sesión con Google
 
-1. Pulsa **Continuar con Google**.
-2. Selecciona la cuenta de Google.
-3. Autoriza los permisos solicitados.
+**Estado:** flujo backend validado el 11/11/2026 con Google Cloud + Supabase Auth + FastAPI + PostgreSQL; botón Android pendiente.
+
+**Flujo previsto en la aplicación:**
+
+1. Pulsa **Continuar con Google** cuando esté disponible en Android.
+2. Selecciona y autentica tu cuenta de Google.
+3. Supabase Auth valida la sesión; el backend de PicRout crea o recupera el usuario y emite su token propio.
+
+**Limitación actual:** si ya existe una cuenta tradicional con el mismo correo, el backend devuelve **409** para evitar vincular cuentas sin autorización. La vinculación segura de cuentas todavía está pendiente. No se requiere establecer una contraseña de PicRout para una cuenta Google nueva.
 
 ### 4.5 Recuperación de contraseña (OTP)
 
 1. En la pantalla de login pulsa **¿Olvidaste tu contraseña?**.
 2. Ingresa el correo asociado a la cuenta.
-3. El sistema envía un **código de 6 dígitos** al correo.
+3. El sistema genera un **código de 6 dígitos**. El envío real por correo depende de la configuración SMTP del entorno; en desarrollo puede mostrarse en los logs del servidor.
 4. El código:
    - Es de **un solo uso**.
    - Tiene validez de **10 minutos**.
@@ -209,7 +215,7 @@ Cada rutina genera una **ocurrencia** por día en el que aplica. Estados:
 
 ---
 
-## 9. Tienda virtual
+## 9. Tienda virtual (planificada)
 
 1. Entra a **Tienda** desde el menú principal.
 2. Explora las categorías:
@@ -224,7 +230,7 @@ Cada rutina genera una **ocurrencia** por día en el que aplica. Estados:
 
 ---
 
-## 10. Red social
+## 10. Red social (planificada)
 
 Funciones disponibles:
 
@@ -237,7 +243,7 @@ Funciones disponibles:
 
 ---
 
-## 11. Notificaciones
+## 11. Notificaciones (planificadas)
 
 La app genera notificaciones para:
 
@@ -270,17 +276,18 @@ La recuperación de contraseña siempre está disponible desde la pantalla de lo
 |---------------------------------------|---------------------------------------------------------------------------|
 | No puedo instalar el APK              | Habilitar “orígenes desconocidos”                                         |
 | No llegan notificaciones              | Revisar permisos de notificaciones + batería optimizada                   |
-| La cámara no abre                     | Conceder permiso de cámara y reiniciar la app                             |
 | Código OTP no llega o expiró          | Revisar spam; solicitar un nuevo código (máx. 10 min de validez)          |
 | No apruebo el quiz                    | Repasa la actividad y vuelve a intentar; el umbral es 60 % de aciertos    |
 | No me suma la racha                   | Verifica que **todas** las rutinas del día estén en estado Completada     |
 | Error de conexión                     | Comprueba Internet; el backend debe estar online                          |
 
-Para errores más técnicos o persistentes consulta el **Manual de Errores** (`docs/Manual_de_Errores.md`).
+Para errores técnicos consulta `Manual_de_Errores.md`; para preparar el entorno y probar el backend, `Guia_Supabase.md` y `Guia_Verificacion_Manual.txt`.
 
 ---
 
 ## 14. Contacto y soporte
+
+- Correo oficial: **picrout@gmail.com** (soporte y correo previsto para notificaciones/OTP, sujeto a configuración de envío).
 
 - Equipo de desarrollo: Sofía Rincón · Juan Pablo Zárate · Sofía Bautista
 - Profesor: Freddy León Reyes
@@ -289,3 +296,13 @@ Para errores más técnicos o persistentes consulta el **Manual de Errores** (`d
 ---
 
 *Documento vivo. Se actualizará con cada sprint y según feedback de pruebas de usuario.*
+
+
+## 15. Estado funcional confirmado (11/11/2026)
+
+- **Backend probado:** salud, registro/login por correo o usuario, perfil en pruebas anteriores, recuperación OTP en pruebas anteriores, operaciones de rutinas y persistencia PostgreSQL; la guía de pruebas permite repetirlos.
+- **Google probado:** `POST /auth/google` validó una sesión real de Supabase, devolvió 200, creó una fila en `public.users` y un segundo login no duplicó la cuenta.
+- **Verificación:** solo `quiz`. Se eliminó la verificación por fotografías.
+- **Pendiente:** integración Android del botón Google, vinculación de cuentas tradicionales, pruebas de seguridad completas y funcionalidades sociales/comerciales anunciadas.
+
+> Este estado refleja las pruebas manuales reportadas, no una certificación de producción.

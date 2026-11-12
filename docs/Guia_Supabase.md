@@ -1,134 +1,75 @@
-# Guía: migrar la base de datos a Supabase (PostgreSQL)
+# Guía de Supabase — configuración compartida de PicRout
 
-**Fecha:** 2026-11-11  
-**Objetivo:** dejar de usar SQLite local y apuntar el backend FastAPI a un PostgreSQL gestionado en Supabase, sin cambiar el código de modelos.
+**Actualización:** 11 de noviembre de 2026  
+**Alcance:** incorporación de equipos, recuperación de conexión y Google OAuth. **No crear un proyecto nuevo por computador.**
 
----
+## ¿Conservar este documento?
+**Sí, en versión breve.** El equipo utiliza **un único proyecto Supabase**, pero cada PC necesita su propio `.env`, y hay configuración de OAuth y de esquema que no se reconstruye solo con `git pull`. La guía antigua de migración SQLite → PostgreSQL queda como antecedente histórico, no como procedimiento cotidiano.
 
-## 1. Crear el proyecto en Supabase
+## 1. Preparar un PC nuevo
+1. Obtener permiso para acceder al proyecto Supabase compartido y al repositorio.
+2. Actualizar la rama adecuada (`git fetch origin`, `git switch <rama>`, `git pull --ff-only`), sin sobrescribir cambios locales.
+3. Instalar dependencias con `python -m pip install -r requirements.txt` desde `backend/`.
+4. Crear `backend/.env` localmente copiando **de manera segura** los nombres/valores autorizados del equipo; **jamás** añadirlo a Git.
+5. Confirmar que `DATABASE_URL` apunta al PostgreSQL **del mismo proyecto**, y que `SUPABASE_URL` y `SUPABASE_ANON_KEY` (si el backend los utiliza con esos nombres) corresponden al mismo proyecto. Conservar la clave JWT requerida por el backend.
+6. Ejecutar desde `backend/`:
 
-1. Entra en [https://supabase.com](https://supabase.com) y crea un proyecto (región cercana, p. ej. `sa-east-1` o `us-east-1`).
-2. Anota la **contraseña de la base de datos** que elijas al crear el proyecto (solo se muestra una vez).
-3. En el dashboard: **Project Settings → Database**.
-
-### Cadena de conexión recomendada
-
-Supabase ofrece dos modos:
-
-| Modo | Uso | Puerto típico |
-|------|-----|----------------|
-| **Session pooler** (Transaction/Session) | API / serverless | `6543` |
-| **Direct** | migraciones, scripts, `create_all` | `5432` |
-
-Para PicRout (FastAPI con SQLAlchemy síncrono) usa preferiblemente:
-
-```text
-postgresql+psycopg2://postgres.[PROJECT_REF]:[TU_PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres
+```powershell
+python -m uvicorn App.main:app --reload
 ```
 
-O la URI **Direct**:
+Desde la raíz de PicRout, alternativa:
 
-```text
-postgresql+psycopg2://postgres:[TU_PASSWORD]@db.[PROJECT_REF].supabase.co:5432/postgres
+```powershell
+python -m uvicorn App.main:app --app-dir backend --reload
 ```
 
-El prefijo `postgresql+psycopg2://` es obligatorio para SQLAlchemy + el driver `psycopg2-binary`.
+> No utilizar `backend.App.main:app` desde `backend/`. No cambiar el código para compensar una ruta de ejecución incorrecta.
 
----
+## 2. Validación de conexión
+- `GET /health` devuelve 200: confirma disponibilidad de la API, **no** por sí solo la base.
+- Registrar usuario de prueba único en `POST /auth/register` (`email`, `username`, `display_name`, `password`).
+- Iniciar sesión en `POST /auth/login` (`identifier`, `password`).
+- Buscar exactamente ese usuario en `public.users` desde SQL Editor.
+- Reiniciar FastAPI y repetir el login; no duplicar la cuenta de prueba.
+- Limpiar cuentas de prueba solo mediante procedimiento autorizado por el equipo y considerando claves foráneas.
 
-## 2. Configurar el backend
+Consulta segura de ejemplo (reemplaza solo el identificador ficticio):
 
-```bash
-cd backend
-cp .env.example .env   # si aún no tienes .env
+```sql
+SELECT id, email, username, display_name
+FROM public.users
+WHERE username = 'usuario_de_prueba';
 ```
 
-Edita `.env`:
+## 3. Google OAuth — configuración compartida
+- En Google Cloud, configurar **Google Auth Platform**, la pantalla de consentimiento y un cliente OAuth de tipo web para Supabase. `picrout@gmail.com` es correo oficial de soporte/contacto, **no** un token ni una contraseña de OAuth.
+- En Google Cloud registrar como redirect autorizado la **callback exacta** indicada en Supabase Authentication → Providers → Google: `https://<project-ref>.supabase.co/auth/v1/callback`.
+- En el proyecto Supabase compartido habilitar Google e introducir allí Client ID y Client Secret. **No** poner Client Secret en APK ni frontend.
+- Para pruebas web locales, permitir explícitamente `http://127.0.0.1:5500/google-test.html` en Authentication → URL Configuration → Redirect URLs.
+- Supabase Auth gestiona `auth.users` (UUID), mientras PicRout gestiona `public.users` (IDs propios). No son tablas intercambiables.
+- La página de prueba obtiene un **access_token de Supabase**; `POST /auth/google` lo valida y emite un **JWT propio de PicRout**. No publicar ninguno de esos tokens.
+- Cuenta tradicional con correo coincidente: la implementación actual devuelve **409** hasta desarrollar vinculación segura; no asociar cuentas solo por correo.
 
-```env
-# Comenta o elimina la línea de SQLite y pon la de Supabase:
-DATABASE_URL=postgresql+psycopg2://postgres.[PROJECT_REF]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres
+## 4. Incidencia resuelta: trigger obsoleto
+En el entorno probado, `on_auth_user_created` en `auth.users` llamaba a `public.handle_new_auth_user()` y trataba de insertar en la inexistente `public.profiles`. Se inspeccionó la función y se retiró **únicamente ese trigger**. No recrearlo indiscriminadamente ni eliminar otros triggers sin auditoría. Esta corrección requiere quedar reflejada en una migración SQL versionada y revisada por el equipo.
 
-DEBUG=False
-SECRET_KEY=una_clave_larga_y_aleatoria
+Consulta **solo lectura** para comprobar si reapareció:
+
+```sql
+SELECT t.tgname, p.oid::regprocedure AS function_name
+FROM pg_trigger AS t
+JOIN pg_proc AS p ON p.oid = t.tgfoid
+WHERE t.tgrelid = 'auth.users'::regclass
+  AND NOT t.tgisinternal;
 ```
 
-Instala dependencias (incluye el driver de Postgres):
+## 5. Seguridad y mantenimiento
+- `backend/.env` debe estar ignorado y **no rastreado** por Git (`git ls-files -- .env` desde `backend/`).
+- No enviar credenciales por chat, capturas, issues ni documentación.
+- No ejecutar `DROP`, migraciones, `create_all` o scripts destructivos en la base compartida sin coordinación; `create_all` **no sustituye** migraciones.
+- Revisar RLS, backups y permisos de PostgreSQL antes de despliegue. La conexión backend con credenciales de DB puede saltarse políticas que sí afectan al cliente.
+- En producción: URLs OAuth verificadas, separación de entornos y gestión de secretos.
 
-```bash
-pip install -r requirements.txt
-```
-
----
-
-## 3. Crear las tablas
-
-Al arrancar la API, `init_db()` ejecuta `Base.metadata.create_all` y crea:
-
-- `users`
-- `password_otps`
-- `routines`
-- `routine_occurrences`
-- `verification_attempts`
-
-```bash
-uvicorn App.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-Comprueba en Supabase → **Table Editor** que aparecen las tablas.
-
-Si prefieres no arrancar el servidor solo para crear tablas:
-
-```bash
-cd backend
-python -c "from storage.database import init_db; init_db(); print('OK tablas creadas')"
-```
-
----
-
-## 4. Datos existentes en SQLite (opcional)
-
-Si ya tienes usuarios/rutinas en `app_routines.db` y quieres **traspasarlos**:
-
-1. Exporta desde SQLite (ejemplo con `sqlite3`):
-
-   ```bash
-   sqlite3 app_routines.db ".mode insert" ".output dump.sql" ".dump" ".exit"
-   ```
-
-2. Adapta el dump a PostgreSQL (tipos, `AUTOINCREMENT` → `SERIAL`/identity, comillas).  
-   Para un proyecto en etapa temprana suele ser más simple **recrear usuarios** en el entorno Supabase y no migrar filas de prueba.
-
-3. Alternativa: script Python con dos engines (origen SQLite + destino Postgres) y copia fila a fila de los modelos SQLAlchemy. Pedir al equipo si hace falta automatizarlo.
-
----
-
-## 5. Seguridad
-
-- **Nunca** subas `.env` al repositorio (ya está en `.gitignore`).
-- En producción restringe CORS y rota `SECRET_KEY`.
-- En Supabase puedes activar **Network restrictions** y usar solo el pooler con SSL (psycopg2 lo usa por defecto en URIs de Supabase).
-
----
-
-## 6. Verificación rápida
-
-```bash
-curl http://127.0.0.1:8000/health
-# → {"status":"ok"}
-
-curl http://127.0.0.1:8000/
-# → app online
-```
-
-Registro de prueba vía `/docs` → `POST /auth/register`. Si el usuario aparece en **Table Editor → users**, la migración está operativa.
-
----
-
-## Resumen de cambios de código (ya aplicados en el repo)
-
-- `requirements.txt`: `psycopg2-binary==2.9.9`
-- `storage/database.py`: pool y `pool_pre_ping` para Postgres; SQLite sin cambios
-- `.env.example`: plantilla `DATABASE_URL` para Supabase + flag de fotos
-
-No hace falta cambiar los modelos (`entities/*`): SQLAlchemy es agnóstico al motor.
+## 6. Estado comprobado el 11/11/2026
+En el segundo PC: `/health`, registro, login, presencia en `public.users` y login después de reiniciar funcionaron. Google Sign-In real: API 200, nuevo usuario en `public.users` y segundo login sin duplicado. **No se ha confirmado integración Android ni pruebas completas de seguridad/producción.**

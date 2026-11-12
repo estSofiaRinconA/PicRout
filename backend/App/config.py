@@ -1,8 +1,14 @@
 from pydantic_settings import BaseSettings
+from pathlib import Path
 from functools import lru_cache
 
+BACKEND_DIR = Path(__file__).resolve().parents[1]
 
 class Settings(BaseSettings):
+    #Authentication de Google mediante DSupabase Auth (OAuth2)
+    SUPABASE_URL: str = ""
+    SUPABASE_ANON_KEY: str = ""
+
     APP_NAME: str = "PicRout"
     APP_VERSION: str = "0.1.0"
     DEBUG: bool = True
@@ -41,8 +47,9 @@ class Settings(BaseSettings):
     XAI_MODEL: str = "grok-4"
 
     class Config:
-        env_file = ".env"
+        env_file = str(BACKEND_DIR / ".env")
         env_file_encoding = "utf-8"
+        extra = "ignore"
 
 
 @lru_cache()

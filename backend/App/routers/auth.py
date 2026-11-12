@@ -6,6 +6,10 @@ Router de Autenticación – Paso 1
 - Recuperación de contraseña con OTP 6 dígitos / 10 min
 - Perfil básico del usuario autenticado
 """
+import secrets
+
+from sqlalchemy.exc import IntegrityError
+from functions.supabase_auth import verify_supabase_google_token
 
 from datetime import datetime, timezone
 
@@ -126,26 +130,115 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
 
 # ---------- Google Sign-In (estructura) ----------
 
-@router.post("/google", response_model=Token)
-def google_login(payload: GoogleLoginRequest, db: Session = Depends(get_db)):
-    """
-    Recibe el id_token de Google (enviado por el cliente Android).
-    Verifica el token con Google y crea o inicia sesión al usuario.
 
-    Nota: para producción se debe verificar el token con la API de Google.
-    Aquí dejamos la estructura lista; mientras tanto se puede probar con
-    un flujo de desarrollo controlado.
+# ---------- Google Sign-In ----------
+
+@router.post("/google", response_model=Token)
+def google_login(
+    payload: GoogleLoginRequest,
+    db: Session = Depends(get_db),
+):
     """
-    # TODO: verificar id_token real con Google (httpx + tokeninfo o google-auth)
-    # Por ahora devolvemos un error claro para no dejar un endpoint inseguro.
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail=(
-            "Google Sign-In está preparado en la arquitectura. "
-            "Falta configurar GOOGLE_CLIENT_ID y la verificación del id_token. "
-            "Usa registro/login con correo mientras tanto."
-        ),
+    Registro o inicio de sesión mediante Google + Supabase Auth.
+
+    No modifica cuentas existentes únicamente por coincidencia
+    de correo electrónico.
+    """
+
+    identity = verify_supabase_google_token(
+        payload.access_token
     )
+
+    google_id = identity["google_id"]
+    email = identity["email"]
+    display_name = identity["display_name"]
+
+    # 1. Buscar una cuenta ya vinculada con Google.
+    user = (
+        db.query(User)
+        .filter(User.google_id == google_id)
+        .first()
+    )
+
+    if user:
+        if not user.is_active:
+            raise HTTPException(
+                status_code=403,
+                detail="Cuenta desactivada",
+            )
+
+        return _create_token_response(user)
+
+    # 2. Comprobar conflictos con cuentas existentes.
+    existing_email = (
+        db.query(User)
+        .filter(User.email == email)
+        .first()
+    )
+
+    if existing_email:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Ya existe una cuenta de PicRout con este correo. "
+                "Inicia sesión mediante tu método habitual. "
+                "La vinculación de Google deberá autorizarse "
+                "desde esa cuenta."
+            ),
+        )
+
+    # 3. Generar un username único.
+    # Nunca utilizamos el correo como identificador público.
+    username = ""
+
+    for _ in range(10):
+        candidate = "google_" + secrets.token_hex(8)
+
+        exists = (
+            db.query(User)
+            .filter(User.username == candidate)
+            .first()
+        )
+
+        if not exists:
+            username = candidate
+            break
+
+    if not username:
+        raise HTTPException(
+            status_code=503,
+            detail="No se pudo generar un nombre de usuario",
+        )
+
+    # 4. Crear el usuario de PicRout.
+    # Sin contraseña local: se autenticará mediante Google.
+    user = User(
+        email=email,
+        username=username,
+        display_name=display_name,
+        google_id=google_id,
+        hashed_password=None,
+        is_admin=False,
+        is_active=True,
+    )
+
+    try:
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Conflicto al crear la cuenta. "
+                "Comprueba si ya existe e inténtalo de nuevo."
+            ),
+        )
+
+    # 5. Entregar el JWT habitual de PicRout.
+    return _create_token_response(user)
+
 
 
 # ---------- Recuperación de contraseña ----------
